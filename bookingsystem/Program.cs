@@ -5,33 +5,65 @@ using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Registrera EF Core med InMemory-databas (enkelt för MVP/test)
-builder.Services.AddDbContext<BookingDbContext>(opt => opt.UseInMemoryDatabase("BookingDb"));
+// --- EF Core InMemory (MVP/test) ---
+builder.Services.AddDbContext<BookingDbContext>(opt =>
+    opt.UseInMemoryDatabase("BookingDb"));
 
-// Registrera våra tjänster (DI)
+// --- DI fï¿½r tjï¿½nster ---
 builder.Services.AddScoped<IEmailService, SmtpEmailService>();
 builder.Services.AddScoped<IBookingService, BookingService>();
 
-// Standard MVC/Swagger setup
+// --- Controllers + Swagger ---
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// --- CORS: tillï¿½t din Vite-frontend ---
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("frontend", p =>
+        p.WithOrigins(
+            "http://localhost:5173",
+            "https://localhost:5173"
+        )
+        .AllowAnyHeader()
+        .AllowAnyMethod()
+    );
+});
+
 var app = builder.Build();
+
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<BookingDbContext>();
+    
+    if (!db.Bookings.Any())
+    {
+        db.Bookings.AddRange(new[]
+        {
+            new Data.Entities.Booking { Id = 1, ClassId = 101, UserId = 1, CreatedAt = DateTime.UtcNow.AddDays(-1), IsCancelled = false },
+            new Data.Entities.Booking { Id = 2, ClassId = 102, UserId = 2, CreatedAt = DateTime.UtcNow.AddDays(-2), IsCancelled = false },
+            new Data.Entities.Booking { Id = 3, ClassId = 103, UserId = 3, CreatedAt = DateTime.UtcNow.AddDays(-3), IsCancelled = true }
+        });
+        db.SaveChanges();
+    }
+}
+
+// --- Swagger i dev ---
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 
+app.UseCors("frontend");
+
+
+app.UseHttpsRedirection();
+
 app.MapControllers();
 
-// (Valfritt) Lägg till en testbokning i minnet vid uppstart
-using (var scope = app.Services.CreateScope())
-{
-    var db = scope.ServiceProvider.GetRequiredService<BookingDbContext>();
-    db.Bookings.Add(new Data.Entities.Booking { Id = 1, ClassId = 101, UserId = 42 });
-    db.SaveChanges();
-}
+
+
 
 app.Run();
