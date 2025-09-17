@@ -1,0 +1,34 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "bookingsystem", "bookingsystem\bookingsystem.csproj", "{D101495F-45FE-4B0B-8AC3-2BB1E814B1A7}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Data", "Data\Data.csproj", "{51AA7A73-8659-49BF-940E-53F5588E969F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Infrastructure", "Infrastructure\Infrastructure.csproj", "{AB1B4334-DBC6-4345-AF33-932F0AAA65FE}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{D101495F-45FE-4B0B-8AC3-2BB1E814B1A7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D101495F-45FE-4B0B-8AC3-2BB1E814B1A7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D101495F-45FE-4B0B-8AC3-2BB1E814B1A7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D101495F-45FE-4B0B-8AC3-2BB1E814B1A7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{51AA7A73-8659-49BF-940E-53F5588E969F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{51AA7A73-8659-49BF-940E-53F5588E969F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{51AA7A73-8659-49BF-940E-53F5588E969F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{51AA7A73-8659-49BF-940E-53F5588E969F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AB1B4334-DBC6-4345-AF33-932F0AAA65FE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AB1B4334-DBC6-4345-AF33-932F0AAA65FE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AB1B4334-DBC6-4345-AF33-932F0AAA65FE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AB1B4334-DBC6-4345-AF33-932F0AAA65FE}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

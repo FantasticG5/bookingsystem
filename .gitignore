@@ -1,0 +1,23 @@
+# Ignore appsettings (configs can contain secrets)
+appsettings*.json
+
+# Build results
+bin/
+obj/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+
+# VS Code
+.vscode/
+
+# Logs
+*.log
+
+# Env files
+.env
+
+# Others
+*.swp
