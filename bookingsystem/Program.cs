@@ -1,4 +1,5 @@
 using Data;
+using Infrastructure.DTOs;
 using Infrastructure.Interfaces;
 using Infrastructure.Repositories;
 using Infrastructure.Services;
@@ -13,6 +14,10 @@ builder.Services.AddDbContext<BookingDbContext>(options =>
 // Repos & Services
 builder.Services.AddScoped<IBookingRepository, BookingRepository>();
 builder.Services.AddScoped<IBookingService, BookingService>();
+
+// Email services för bekräftelsemail
+builder.Services.AddScoped<EmailService>();
+builder.Services.AddScoped<IEventHandler<BookingCreatedEvent>, BookingCreatedEmailService>();
 
 // Namngiven HttpClient för mikroservicen
 builder.Services.AddHttpClient("TrainingClasses", client =>

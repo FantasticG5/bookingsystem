@@ -21,3 +21,6 @@ obj/
 
 # Others
 *.swp
+
+# Warp terminal files
+WARP.md
