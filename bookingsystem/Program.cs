@@ -12,6 +12,7 @@ builder.Services.AddDbContext<BookingDbContext>(options =>
 
 // Repos & Services
 builder.Services.AddScoped<IBookingRepository, BookingRepository>();
+builder.Services.AddScoped<IEmailSender, AzureEmailSender>();
 builder.Services.AddScoped<IBookingService, BookingService>();
 
 // Namngiven HttpClient för mikroservicen

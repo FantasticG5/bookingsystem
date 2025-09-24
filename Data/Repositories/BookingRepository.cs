@@ -26,4 +26,16 @@ public class BookingRepository : IBookingRepository
         return await _context.Bookings
             .FirstOrDefaultAsync(b => b.ClassId == classId && b.UserId == userId && !b.IsCancelled);
     }
+
+    public async Task<bool> CancelBookingAsync(int classId, int userId)
+    {
+        var booking = await _context.Bookings
+            .FirstOrDefaultAsync(b => b.ClassId == classId && b.UserId == userId);
+
+        if (booking is null) return false;
+        if (booking.IsCancelled) return true; // idempotent
+
+        booking.IsCancelled = true;
+        return await _context.SaveChangesAsync() > 0;
+    }
 }
