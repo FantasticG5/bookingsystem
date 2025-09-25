@@ -6,4 +6,5 @@ public interface IBookingRepository
 {
     Task<Booking> AddBookingAsync(Booking booking);
     Task<Booking?> GetBookingAsync(int classId, int userId);
+    Task<bool> CancelBookingAsync(int classId, int userId);
 }
