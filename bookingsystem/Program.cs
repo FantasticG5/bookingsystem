@@ -31,15 +31,19 @@ builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
+// >>> alltid på
+app.UseSwagger();
+app.UseSwaggerUI(c =>
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "API v1");
+});
 
 app.UseCors(x => x.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod());
 
 // app.UseHttpsRedirection();
 app.MapControllers();
+
+// Redirecta root -> swagger (nu funkar även i prod)
 app.MapGet("/", () => Results.Redirect("/swagger"));
+
 app.Run();
