@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using Microsoft.AspNetCore.Mvc;
 using Infrastructure.DTOs;
 using Infrastructure.Interfaces;
+using System.Security.Claims;
 
 namespace bookingsystem.Controllers
 {
@@ -12,7 +13,7 @@ namespace bookingsystem.Controllers
     {
         private readonly IBookingService _bookingService;
         private readonly HttpClient _seatsApi;
-         private readonly IBookingService _service;
+        private readonly IBookingService _service;
 
         public BookingController(IBookingService bookingService, IHttpClientFactory httpClientFactory, IBookingService service)
         {
@@ -21,55 +22,65 @@ namespace bookingsystem.Controllers
             _service = service;
         }
 
-        [HttpPost]
-        public async Task<IActionResult> BookClass([FromBody] BookingDto dto, CancellationToken ct)
+        [HttpGet("my")]
+        public async Task<IActionResult> GetMy(CancellationToken ct)
         {
-            var reserveResponse = await _seatsApi.PostAsJsonAsync(
-                $"api/trainingclasses/{dto.ClassId}/seats/reserve",
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrWhiteSpace(userId)) return Unauthorized();
+
+            var bookings = await _service.GetByUserAsync(userId, ct);
+            return Ok(bookings);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> BookClass([FromBody] CreateBookingRequest req, CancellationToken ct)
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrWhiteSpace(userId)) return Unauthorized();
+
+            // 1) reservera plats i EventSystem
+            var reserve = await _seatsApi.PostAsJsonAsync(
+                $"api/trainingclasses/{req.ClassId}/seats/reserve",
                 new { Seats = 1 }, ct);
 
-            if (!reserveResponse.IsSuccessStatusCode)
+            if (!reserve.IsSuccessStatusCode)
                 return Conflict(new { message = "Could not reserve seat." });
 
             try
             {
-                var booking = await _bookingService.BookClassAsync(dto);
-                return Ok(booking);
+                // 2) skapa bokning
+                var booking = await _bookingService.BookClassAsync(userId, req.ClassId, ct);
+                return Ok(new BookingReadDto(booking.Id, booking.ClassId, booking.CreatedAt, booking.IsCancelled));
             }
             catch (Exception ex)
             {
+                // 3) rollback på seats
                 await _seatsApi.PostAsJsonAsync(
-                    $"api/trainingclasses/{dto.ClassId}/seats/release",
+                    $"api/trainingclasses/{req.ClassId}/seats/release",
                     new { Seats = 1 }, ct);
-
                 return Conflict(new { message = ex.Message });
             }
         }
 
         [HttpPost("cancel")]
-        public async Task<IActionResult> Cancel([FromBody] CancelBookingDto dto, CancellationToken ct)
+        public async Task<IActionResult> Cancel([FromBody] CancelBookingRequest req, CancellationToken ct)
         {
-            if (string.IsNullOrWhiteSpace(dto.Email))
-                return BadRequest(new { error = "Email krävs." });
+           var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var email  = User.FindFirstValue(ClaimTypes.Email);
 
-            // 1) Avboka i vår DB + skicka mail (din service gör redan båda)
-            var cancelled = await _service.CancelBookingAsync(dto);
-            if (!cancelled) return NotFound(new { error = "Ingen sådan bokning hittades." });
+            var changed = await _bookingService.CancelBookingAsync(userId!, req.ClassId, email, ct);
+            if (!changed)
+                return Ok(new { message = "Already cancelled or not found." }); // eller 404 om du vill
 
-            // 2) Släpp plats i eventsystemet (1 plats)
-            var releaseRes = await _seatsApi.PostAsJsonAsync(
-                $"api/trainingclasses/{dto.ClassId}/seats/release",
+            // släpp EN plats när vi faktiskt avbokade
+            var release = await _seatsApi.PostAsJsonAsync(
+                $"api/trainingclasses/{req.ClassId}/seats/release",
                 new { Seats = 1 }, ct);
 
-            // Policy: välj “best effort” eller “strikt”
-            if (!releaseRes.IsSuccessStatusCode)
-            {
-                // Best effort: returnera 200 men meddela att release misslyckades
-                // (alternativ: returnera Conflict/BadGateway om du vill vara strikt)
-                return Ok(new { message = "Avbokad, men kunde inte släppa platsen i klasslistan just nu." });
-            }
+            if (!release.IsSuccessStatusCode)
+                return Ok(new { message = "Avbokad, men platsen kunde inte släppas nu." });
 
-            return Ok(new { message = "Avbokning klar och bekräftelse skickad." });
+            return Ok(new { message = "Avbokning klar." });
         }
     }
 }

@@ -11,19 +11,18 @@ public class BookingService(IBookingRepository repository, IEmailSender email) :
     private readonly IBookingRepository _repository = repository;
     private readonly IEmailSender _email = email;
 
-    public async Task<Booking> BookClassAsync(BookingDto dto)
+    public async Task<Booking> BookClassAsync(string userId, int classId, CancellationToken ct = default)
     {
         // Simple rule: one booking per user/class
-        var existing = await _repository.GetBookingAsync(dto.ClassId, dto.UserId);
-        if (existing != null)
-        {
+        // en bokning per user/klass
+        var existing = await _repository.GetBookingAsync(classId, userId);
+        if (existing is not null)
             throw new InvalidOperationException("User has already booked this class.");
-        }
 
         var booking = new Booking
         {
-            ClassId = dto.ClassId,
-            UserId = dto.UserId,
+            ClassId = classId,
+            UserId  = userId,
             CreatedAt = DateTime.UtcNow,
             IsCancelled = false
         };
@@ -31,26 +30,29 @@ public class BookingService(IBookingRepository repository, IEmailSender email) :
         return await _repository.AddBookingAsync(booking);
     }
 
-    public async Task<bool> CancelBookingAsync(CancelBookingDto dto)
+    public async Task<IReadOnlyList<BookingReadDto>> GetByUserAsync(string userId, CancellationToken ct = default)
     {
-        var ok = await _repository.CancelBookingAsync(dto.ClassId, dto.UserId);
-        if (!ok) return false;
+        var items = await _repository.GetByUserAsync(userId, ct);
+        return items.Select(b => new BookingReadDto(b.Id, b.ClassId, b.CreatedAt, b.IsCancelled)).ToList();
+    }
 
-        var subject = "Bekräftelse på avbokning";
-        var html = $@"
-          <div style=""font-family:Arial,sans-serif"">
-            <h2>Din avbokning är registrerad</h2>
-            <p>Hej!</p>
-            <p>Vi har avbokat din plats för klass <b>#{dto.ClassId}</b>.</p>
-            <ul>
-              <li>Användare: {dto.UserId}</li>
-              <li>Status: Avbokad</li>
-            </ul>
-            <p>Hör av dig om något verkar fel.</p>
-            <p>/Teamet</p>
-          </div>";
+    public async Task<bool> CancelBookingAsync(string userId, int classId, string? email = null, CancellationToken ct = default)
+    {
+       var changed = await _repository.CancelBookingAsync(classId, userId, ct);
+    if (!changed) return false;
 
-        await _email.SendAsync(dto.Email, subject, html);
+        if (!string.IsNullOrWhiteSpace(email))
+        {
+            var subject = "Bekräftelse på avbokning";
+            var html = $@"
+              <div style=""font-family:Arial,sans-serif"">
+                <h2>Din avbokning är registrerad</h2>
+                <p>Hej!</p>
+                <p>Vi har avbokat din plats för klass <b>#{classId}</b>.</p>
+                <p>/Teamet</p>
+              </div>";
+            await _email.SendAsync(email, subject, html);
+        }
         return true;
     }
 }

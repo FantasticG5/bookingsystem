@@ -6,6 +6,8 @@ namespace Infrastructure.Interfaces;
 
 public interface IBookingService
 {
-    Task<Booking> BookClassAsync(BookingDto dto);
-     Task<bool> CancelBookingAsync(CancelBookingDto dto);
+    Task<Booking> BookClassAsync(string userId, int classId, CancellationToken ct = default);
+    Task<IReadOnlyList<BookingReadDto>> GetByUserAsync(string userId, CancellationToken ct = default);
+    Task<bool> CancelBookingAsync(string userId, int classId, string? email = null, CancellationToken ct = default);
+
 }

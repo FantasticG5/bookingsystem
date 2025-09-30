@@ -1,10 +1,10 @@
-using System;
+// using System;
 
-namespace Infrastructure.DTOs;
+// namespace Infrastructure.DTOs;
 
-public class CancelBookingDto
-{
-    public int ClassId { get; set; }
-    public int UserId { get; set; }
-    public string Email { get; set; } = default!;
-}
+// public class CancelBookingDto
+// {
+//     public int ClassId { get; set; }
+//     public string UserId { get; set; } = default!;
+//     public string Email { get; set; } = default!;
+// }
