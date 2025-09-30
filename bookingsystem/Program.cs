@@ -58,7 +58,7 @@ builder.Services.AddAuthorization();
 
 // ===== CORS =====
 const string SpaCors = "spa";
-string[] allowedOrigins = { "https://localhost:5173", "http://localhost:5173"};
+string[] allowedOrigins = { "https://fantasticg5-dmdbeshvcmfxe6ey.northeurope-01.azurewebsites.net", "http://localhost:5173", "https://localhost:5173"};
 
 builder.Services.AddCors(opt =>
 {
