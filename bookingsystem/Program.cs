@@ -1,36 +1,30 @@
+// Program.cs (Booking)
 using Data;
 using Infrastructure.Interfaces;
-using Infrastructure.Repositories;
 using Infrastructure.Services;
-using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.AspNetCore.DataProtection;
-using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
+using Infrastructure.Repositories;
+using Infrastructure.option;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ===== EF Core =====
+// EF (som du hade)
 builder.Services.AddDbContext<BookingDbContext>(opt =>
     opt.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// ===== DataProtection (delad nyckelring mellan tjänster) =====
-var keysPath = Path.Combine(
-    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-    "CoreGym", "dp-keys"
-);
-Directory.CreateDirectory(keysPath);
+builder.Configuration.AddEnvironmentVariables();
+builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
 
-builder.Services.AddDataProtection()
-    .PersistKeysToFileSystem(new DirectoryInfo(keysPath))
-    .SetApplicationName("CoreGym"); // MÅSTE matcha AuthSystem
-
-// ===== Repos/Services =====
+// Repos/Services (som du hade)
 builder.Services.AddScoped<IBookingRepository, BookingRepository>();
 builder.Services.AddScoped<IEmailSender, AzureEmailSender>();
 builder.Services.AddScoped<IBookingService, BookingService>();
 
-// ===== HttpClient mot EventSystem =====
+// HttpClient till EventSystem (som du hade)
 builder.Services.AddHttpClient("TrainingClasses", client =>
 {
     var baseUrl = builder.Configuration["TrainingClasses:BaseUrl"]
@@ -39,88 +33,78 @@ builder.Services.AddHttpClient("TrainingClasses", client =>
     client.Timeout = TimeSpan.FromSeconds(15);
 });
 
-// ===== Cookie-auth =====
-builder.Services
-    .AddAuthentication(IdentityConstants.ApplicationScheme) // <-- samma som Identity
-    .AddCookie(IdentityConstants.ApplicationScheme, o =>
+// JWT Bearer
+var jwt = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()!;
+var accessKey = new SymmetricSecurityKey(Convert.FromBase64String(jwt.AccessKey));
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(o =>
     {
-        o.Cookie.Name = ".myapp.id";               // <-- samma namn
-        o.Cookie.SameSite = SameSiteMode.None;
-        o.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-        o.Events = new CookieAuthenticationEvents
+        o.TokenValidationParameters = new()
         {
-            OnRedirectToLogin = ctx => { ctx.Response.StatusCode = 401; return Task.CompletedTask; },
-            OnRedirectToAccessDenied = ctx => { ctx.Response.StatusCode = 403; return Task.CompletedTask; }
+            ValidIssuer = jwt.Issuer,
+            ValidAudience = jwt.Audience,
+            IssuerSigningKey = accessKey,
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateIssuerSigningKey = true,
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromSeconds(30)
         };
     });
 
 builder.Services.AddAuthorization();
 
-// ===== CORS =====
+// CORS (utan credentials)
 const string SpaCors = "spa";
-string[] allowedOrigins = { "https://fantasticg5-dmdbeshvcmfxe6ey.northeurope-01.azurewebsites.net", "http://localhost:5173", "https://localhost:5173"};
-
+string[] allowedOrigins = {
+    "https://fantasticg5-dmdbeshvcmfxe6ey.northeurope-01.azurewebsites.net",
+    "http://localhost:5173",
+    "https://localhost:5173"
+};
 builder.Services.AddCors(opt =>
 {
     opt.AddPolicy(SpaCors, p => p
         .WithOrigins(allowedOrigins)
         .AllowAnyHeader()
-        .AllowAnyMethod()
-        .AllowCredentials());
-});
-
-// ===== CSRF/Antiforgery (för att säkra POST/DELETE från browsern) =====
-builder.Services.AddAntiforgery(o =>
-{
-    o.HeaderName = "X-XSRF-TOKEN";
-    o.Cookie.Name = ".CoreGym.Anti";
-    o.Cookie.SameSite = SameSiteMode.None;
-    o.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-    o.Cookie.HttpOnly = false;
+        .AllowAnyMethod());
 });
 
 builder.Services.AddControllers();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new OpenApiInfo { Title = "Booking API", Version = "v1" });
+    var jwtScheme = new OpenApiSecurityScheme
+    {
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        Name = "Authorization",
+        In = ParameterLocation.Header,
+        Type = SecuritySchemeType.Http,
+        Reference = new OpenApiReference { Id = "Bearer", Type = ReferenceType.SecurityScheme }
+    };
+    c.AddSecurityDefinition("Bearer", jwtScheme);
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement { { jwtScheme, Array.Empty<string>() } });
+});
 
 var app = builder.Build();
+
+app.UseForwardedHeaders(new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedFor,
+    RequireHeaderSymmetry = false,
+    ForwardLimit = null
+});
+
+app.UseCors(SpaCors);
 
 app.UseSwagger();
 app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "Booking API"));
 
-app.UseHttpsRedirection();
-app.UseCors(SpaCors);
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.Use(async (ctx, next) =>
-{
-    if (HttpMethods.IsPost(ctx.Request.Method) ||
-        HttpMethods.IsPut(ctx.Request.Method)  ||
-        HttpMethods.IsPatch(ctx.Request.Method)||
-        HttpMethods.IsDelete(ctx.Request.Method))
-    {
-        var antiforgery = ctx.RequestServices.GetRequiredService<IAntiforgery>();
-        await antiforgery.ValidateRequestAsync(ctx);
-    }
-    await next();
-});
-
-// ===== CSRF helper endpoint =====
-app.MapGet("/csrf", (IAntiforgery af, HttpContext ctx) =>
-{
-    var tokens = af.GetAndStoreTokens(ctx); // skapar/lagrar cookie-token
-    // Lägg även ut REQUEST-token i en läsbar cookie så frontend kan hämta den:
-    ctx.Response.Cookies.Append("XSRF-TOKEN-BOOKING", tokens.RequestToken!, new CookieOptions
-    {
-        HttpOnly = false,
-        Secure = true,
-        SameSite = SameSiteMode.None
-    });
-    return Results.NoContent();
-});
-
 app.MapControllers();
-
 app.MapGet("/", () => Results.Redirect("/swagger"));
 
 app.Run();
