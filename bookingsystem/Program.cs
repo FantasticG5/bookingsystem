@@ -58,7 +58,7 @@ builder.Services.AddAuthorization();
 // CORS (utan credentials)
 const string SpaCors = "spa";
 string[] allowedOrigins = {
-    "https://fantasticg5-dmdbeshvcmfxe6ey.northeurope-01.azurewebsites.net",
+    "https://fantasticg5-dmdbeshvcmfxe6ey.westeurope-01.azurewebsites.net",
     "http://localhost:5173",
     "https://localhost:5173"
 };
