@@ -46,10 +46,12 @@ namespace bookingsystem.Controllers
             if (!reserve.IsSuccessStatusCode)
                 return Conflict(new { message = "Could not reserve seat." });
 
+                var email = User.FindFirstValue(ClaimTypes.Email);
+
             try
             {
                 // 2) skapa bokning
-                var booking = await _bookingService.BookClassAsync(userId, req.ClassId, ct);
+                var booking = await _bookingService.BookClassAsync(userId, req.ClassId, email, ct);
                 return Ok(new BookingReadDto(booking.Id, booking.ClassId, booking.CreatedAt, booking.IsCancelled));
             }
             catch (Exception ex)
